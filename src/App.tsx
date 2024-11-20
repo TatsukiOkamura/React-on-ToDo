@@ -1,6 +1,10 @@
-import { useState ,ChangeEvent } from 'react';
+import { useEffect, useState , ChangeEvent } from 'react';
 import { Todo } from './types/Todo';
 import { Filter } from './types/Filter';
+import { isTodos } from './lib/isTodos';
+// localforage をインポート
+import localforage from 'localforage';
+
 
 export default function App(){
   //初期値：空文字''
@@ -28,56 +32,19 @@ export default function App(){
     setText('');
   };
 
-  // 登録済みTodoの編集用イベントハンドラ
-  const handleEdit = (id: number, value: string) => {
+  //ジェネリクスを使った簡略化
+  const handleTodo = <K extends keyof Todo, V extends Todo[K]>(
+    id: number,
+    key: K,
+    value: V
+  ) =>{
     setTodos((todos) =>{
-      /*
-      引数として渡された todo の idが一致する
-      更新前のtodosステート内のtodoのvalueプロパティーを引数value(= e. targt.value)に書き換える
-      */
-     const newTodos = todos.map((todo) => {
-      if(todo.id === id){       //===は数値も型も比較する
-          /*
-           * この階層でオブジェクト todo をコピー・展開し、
-           * その中で value プロパティを引数で上書きする
-          */
-          return {...todo, value: value };
-          
-      }
-      return todo;
-     });
-      // todos ステートが書き換えられていないかチェック
-      console.log('=== Original todos ===');
-      todos.map((todo) => {
-        console.log(`id: ${todo.id}, value: ${todo.value}`);
-      });
-     //ステートの更新
-     return newTodos;
-    });
-  };
-  
-  //チェックボックスがチェックされたときの処理
-  const handleCheck = (id: number, checked: boolean) => {
-    setTodos((todos) => {
-      const newTodos = todos.map((todo) => {
-        if (todo.id === id) {
-          return {...todo, checked};
+      const newTodos = todos.map((todo) =>{
+        if(todo.id === id){
+          return{...todo, [key]: value};
+        }else{
+          return todo;
         }
-        return todo;
-      });
-
-      return newTodos;
-    });
-  };
-
-  //削除ボタンの処理
-  const handleRemove = (id: number, removed: boolean) => {
-    setTodos((todos) => {
-      const newTodos = todos.map((todo) => {
-        if (todo.id === id) {
-          return {...todo, removed};
-        }
-        return todo;
       });
 
       return newTodos;
@@ -115,6 +82,19 @@ export default function App(){
     }
   });
 
+  //キー名 'todo-20200101' のデータを取得
+  // 第 2 引数の配列が空なのでコンポーネントのマウント時のみに実行される
+  useEffect(() => {
+    localforage
+      .getItem('todo-20241120')
+      .then((values) => isTodos(values) && setTodos(values as Todo[]));
+  }, []);
+
+  //todos ステートが更新されたら、その値を保存
+  useEffect(() => {
+    localforage.setItem('todo-20241120',todos);
+  }, [todos]);
+  
   return(
     <>
       <select
@@ -170,15 +150,15 @@ export default function App(){
              type="checkbox"
              disabled={todo.removed}
              checked={todo.checked}
-             onChange={() => handleCheck(todo.id, !todo.checked)}
+             onChange={() => handleTodo(todo.id, 'checked', !todo.checked)}
             />
             <input
               type="text"
               disabled={todo.checked || todo.removed}
               value={todo.value}
-              onChange={(e) => handleEdit(todo.id, e.target.value)}
+              onChange={(e) => handleTodo(todo.id,'value', e.target.value)}
             />
-            <button onClick={() => handleRemove(todo.id, !todo.removed)}>
+            <button onClick={() => handleTodo(todo.id,'removed', !todo.removed)}>
               {todo.removed ?'復元' : '削除'}
             </button>
             
@@ -192,8 +172,10 @@ export default function App(){
 
 
 // git init
-// git add -A
+// git add .
 // git commit -m "first commit"
 // git branch -M main
 // git remote add origin (URL)
 // git push -u origin main
+// git branch test
+// git checkout test
